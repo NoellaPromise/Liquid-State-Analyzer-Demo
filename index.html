@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Liquid State Analyzer </title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Liquid State Analyzer</h1> 
+        <div id="results" class="results">
+            <div class="flask-container">
+                <div class="flask-top"></div>
+                <div class="flask-neck"></div>
+                <div class="flask">
+                    <div id="liquidInFlask" class="liquid-still"></div>
+                </div>
+            </div>
+
+            <div class="results-text">
+                <div class="state-title" id="stateName">LIQUID</div>
+                <div class="result-info" id="liquidName">Liquid Name</div>
+                <div class="result-info" id="currentTemp">Temperature: --°C</div>
+                <div class="result-info" id="currentPressure">Pressure: -- atm</div>
+                <div class="result-info" id="stateDescription">Description will appear here</div>
+            </div>
+        </div>
+
+        <!-- Error messages -->
+        <div id="error" class="error"></div>
+        
+        <!-- Form -->
+        <form id="analyzerForm">
+            <div class="form-group">
+                <label for="temperature">Temperature (°C):</label>
+                <input type="number" id="temperature" step="0.1" placeholder="Enter temperature in Celsius" required>
+            </div>
+
+            <div class="form-group">
+                <label for="pressure">Atmospheric Pressure (atm):</label>
+                <input type="number" id="pressure" step="0.1" value="1.0" placeholder="1.0 = normal sea level pressure" required>
+            </div>
+
+            <div class="form-group">
+                <label for="liquid">Select Liquid:</label>
+                <select id="liquid" required>
+                    <option value="">Choose a liquid...</option>
+                    <option value="water">Water (H₂O)</option>
+                    <option value="ethanol">Ethanol (C₂H₅OH)</option>
+                    <option value="mercury">Mercury (Hg)</option>
+                    <option value="nitrogen">Nitrogen (N₂)</option>
+                    <option value="oxygen">Oxygen (O₂)</option>
+                </select>
+            </div>
+
+            <button type="submit" class="analyze-button">Analyze Liquid State</button>
+        </form>
+    </div>
+
+    <script>
+        // Liquid database with physical properties
+        const liquidDatabase = {
+            water: {
+                name: "Water (H₂O)",
+                freezing_point: 0.0,
+                boiling_point: 100.0
+            },
+            ethanol: {
+                name: "Ethanol (C₂H₅OH)",
+                freezing_point: -114.1,
+                boiling_point: 78.4
+            },
+            mercury: {
+                name: "Mercury (Hg)",
+                freezing_point: -38.8,
+                boiling_point: 356.7
+            },
+            nitrogen: {
+                name: "Nitrogen (N₂)",
+                freezing_point: -210.0,
+                boiling_point: -195.8
+            },
+            oxygen: {
+                name: "Oxygen (O₂)",
+                freezing_point: -218.8,
+                boiling_point: -183.0
+            }
+        };
+
+        // Form submission handler
+        document.getElementById('analyzerForm').addEventListener('submit', function(event) {
+            event.preventDefault();
+            
+            const temperature = parseFloat(document.getElementById('temperature').value);
+            const pressure = parseFloat(document.getElementById('pressure').value);
+            const liquidType = document.getElementById('liquid').value;
+            
+            // Input validation
+            if (!liquidType) {
+                showError('Please select a liquid to analyze!');
+                return;
+            }
+            
+            if (pressure <= 0) {
+                showError('Pressure must be greater than 0 atm!');
+                return;
+            }
+
+            if (isNaN(temperature)) {
+                showError('Please enter a valid temperature!');
+                return;
+            }
+            
+            // Clear any previous errors
+            document.getElementById('error').style.display = 'none';
+            
+            // Perform analysis
+            analyzeLiquid(temperature, pressure, liquidType);
+        });
+        
+        function analyzeLiquid(temperature, pressure, liquidType) {
+            const liquid = liquidDatabase[liquidType];
+            
+            // Calculate pressure effect on boiling point
+            // Clausius-Clapeyron approximation: ~10°C per atm for water-like substances
+            const pressureDifference = pressure - 1.0;
+            const adjustedBoilingPoint = liquid.boiling_point + (pressureDifference * 10.0);
+            
+            let state, stateClass, description, flaskState;
+            
+            // Determine liquid state based on temperature thresholds
+            if (temperature <= liquid.freezing_point) {
+                state = "SOLID";
+                stateClass = "solid-state";
+                flaskState = "frozen";
+                description = `FROZEN! Temperature ${temperature}°C is at or below freezing point (${liquid.freezing_point}°C)`;
+            } else if (temperature >= adjustedBoilingPoint) {
+                state = "GAS";
+                stateClass = "gas-state";
+                flaskState = "boiling";
+                description = `BOILING! Temperature ${temperature}°C is at or above adjusted boiling point (${adjustedBoilingPoint.toFixed(1)}°C)`;
+            } else {
+                state = "LIQUID";
+                stateClass = "liquid-state";
+                flaskState = "still";
+                description = `LIQUID state! Temperature is between freezing (${liquid.freezing_point}°C) and boiling (${adjustedBoilingPoint.toFixed(1)}°C) points`;
+            }
+            
+            // Display results
+            displayResults({
+                liquid_name: liquid.name,
+                temperature: temperature,
+                pressure: pressure,
+                state: state,
+                state_class: stateClass,
+                flask_state: flaskState,
+                description: description
+            });
+        }
+        
+        function displayResults(results) {
+            // Update flask visualization
+            showFlaskState(results.flask_state);
+            
+            // Update state title with proper class
+            const stateElement = document.getElementById('stateName');
+            stateElement.textContent = results.state;
+            stateElement.className = `state-title ${results.state_class}`;
+            
+            // Update all result information
+            document.getElementById('liquidName').textContent = results.liquid_name;
+            document.getElementById('currentTemp').textContent = `Temperature: ${results.temperature}°C`;
+            document.getElementById('currentPressure').textContent = `Pressure: ${results.pressure} atm`;
+            document.getElementById('stateDescription').textContent = results.description;
+            
+            // Show results container
+            document.getElementById('results').classList.add('show');
+        }
+        
+        function showFlaskState(state) {
+            const liquidElement = document.getElementById('liquidInFlask');
+            
+            // Clear all existing classes
+            liquidElement.className = '';
+            
+            // Apply the appropriate state class
+            switch(state) {
+                case 'frozen':
+                    liquidElement.className = 'liquid-frozen';
+                    break;
+                case 'boiling':
+                    liquidElement.className = 'liquid-boiling';
+                    break;
+                case 'still':
+                default:
+                    liquidElement.className = 'liquid-still';
+                    break;
+            }
+        }
+        
+        function showError(message) {
+            const errorDiv = document.getElementById('error');
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+            
+            // Hide results if there's an error
+            document.getElementById('results').classList.remove('show');
+        }
+
+        // Initialize the page
+        console.log('🧪 Liquid State Analyzer loaded successfully!');
+        console.log('📚 Grade 8 Coding Club Project - NLS');
+    </script>
+</body>
+</html>
